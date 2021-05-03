@@ -1,5 +1,5 @@
 {
-  "name": "@jarvisuser90/postgraphile-apollo-federation-plugin",
+  "name": "postgraphile-apollo-federation-plugin",
   "version": "0.1.0",
   "description": "Apollo Federation support for Graphile Engine",
   "main": "dist/index.js",
