@@ -27,11 +27,17 @@ jobs:
           paths:
             - ~/.cache/npm
 
+      - run:
+          name: Build Project
+          command: npm run build
+
       # Save our workspace so we can access it from other containers.
       - persist_to_workspace:
-          root: ~/
+          root: /home/circleci/project
           paths:
-            - .
+            - dist
+            - package.json
+            - package-lock.json
 
   # Publish npm packages.
   publish:
@@ -41,15 +47,15 @@ jobs:
     steps:
       # Attach preview workspace to the `publish` container.
       - attach_workspace:
-          at: ~/
+          at: /home/circleci/project
 
       - run:
-          name: Build Project
-          command: npm run build
-
-      - run:
-          name: Authenticate With NPM Registry
+          name: Create .npmrc File
           command: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
+
+      - run:
+          name: Pack Package
+          command: npm pack
 
       - run:
           name: Publish Package
@@ -61,8 +67,6 @@ workflows:
       - build
       - approval_required:
           type: approval
-          requires:
-            - build
           filters:
             tags:
               only: /^v.*/
@@ -78,3 +82,23 @@ workflows:
               only: /^v.*/
             branches:
               ignore: /.*/
+
+  # publish:
+  #   jobs:
+  #     - approval_required:
+  #         type: approval
+  #         filters:
+  #           tags:
+  #             only: /^v.*/
+  #           branches:
+  #             ignore: /.*/
+
+  #     # Publish NPM package only when tag starts with `v`
+  #     - publish:
+  #         requires:
+  #           - approval_required
+  #         filters:
+  #           tags:
+  #             only: /^v.*/
+  #           branches:
+  #             ignore: /.*/
