@@ -1,0 +1,26 @@
+os: linux
+dist: xenial
+
+language: node_js
+
+node_js:
+  - "node"
+
+cache: npm
+
+install:
+  - npm ci
+
+script:
+  - npm run build
+
+deploy:
+  # edge: true
+  provider: npm
+  email: $NPM_EMAIL
+  api_token: $NPM_TOKEN
+  access: public
+  cleanup: false
+  on:
+    branch: main
+    tags: true
