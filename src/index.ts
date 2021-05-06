@@ -294,8 +294,19 @@ const AddKeyPlugin: Plugin = (builder) => {
       build: Build,
       context: Context<GraphQLFieldConfigMap<unknown, unknown>>,
     ) => {
-      const { Self } = context;
+      const {
+        Self,
+        scope: { isRootQuery },
+      } = context;
 
+      // Drop the `query` field. If we don't remove it,
+      // it will clash with other federated services `query` fields.
+      if (isRootQuery) {
+        const { query, ...rest } = fields;
+        return rest;
+      }
+
+      // Skip if not an entity we want to federate.
       if (!build.EntityNamesToFederate.includes(Self.name)) {
         return fields;
       }
@@ -366,7 +377,10 @@ const AddKeyPlugin: Plugin = (builder) => {
 
     // Add our types to the entity types
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return [...types, ...new Set(build.graphqlObjectTypesForEntityType)] as any[];
+    return [
+      ...types,
+      ...new Set(build.graphqlObjectTypesForEntityType),
+    ] as any[];
   });
 };
 
