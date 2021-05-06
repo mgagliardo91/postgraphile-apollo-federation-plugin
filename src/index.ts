@@ -277,9 +277,11 @@ const AddKeyPlugin: Plugin = (builder) => {
 
       type.astNode = astNode as ObjectTypeDefinitionNode;
 
-      // Add type name to list so we can use it later to get
-      // it's GraphQLObjectType and add it to the _Entity union type.
-      build.EntityNamesToFederate.push(type.name);
+      if (!build.EntityNamesToFederate.includes(type.name)) {
+        // Add type name to list so we can use it later to get
+        // it's GraphQLObjectType and add it to the _Entity union type.
+        build.EntityNamesToFederate.push(type.name);
+      }
 
       return type;
     },
@@ -298,8 +300,15 @@ const AddKeyPlugin: Plugin = (builder) => {
         return fields;
       }
 
-      // Add this to the list of types to be in the _Entity union.
-      build.graphqlObjectTypesForEntityType.push(Self);
+      if (
+        !(build.graphqlObjectTypesForEntityType as []).some(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (e: any) => e.name === Self.name,
+        )
+      ) {
+        // Add this to the list of types to be in the _Entity union.
+        build.graphqlObjectTypesForEntityType.push(Self);
+      }
 
       return fields;
     },
@@ -356,7 +365,8 @@ const AddKeyPlugin: Plugin = (builder) => {
     }
 
     // Add our types to the entity types
-    return [...types, ...build.graphqlObjectTypesForEntityType];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return [...types, ...new Set(build.graphqlObjectTypesForEntityType)] as any[];
   });
 };
 
