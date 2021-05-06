@@ -30,10 +30,6 @@
     "noUnusedParameters": false,
     "noUnusedLocals": false
   },
-  "exclude": [
-    "node_modules",
-    "dist",
-    "__tests__",
-    "**/__tests__"
-  ]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "__tests__", "**/__tests__"]
 }
