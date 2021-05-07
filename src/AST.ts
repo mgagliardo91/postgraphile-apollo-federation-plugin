@@ -2,7 +2,13 @@
  * These helpers help us to construct AST nodes required for Apollo Federation's printSchema to work.
  */
 
-import { ArgumentNode, DirectiveNode, NameNode } from "graphql";
+import {
+  ArgumentNode,
+  DirectiveNode,
+  NameNode,
+  ObjectTypeDefinitionNode,
+  StringValueNode,
+} from "graphql";
 
 /**
  * Construct AST `name` node required for Apollo Federation's printSchema.
@@ -22,14 +28,11 @@ export function Name(value: string): NameNode {
  * @param block A value indicating whether or not to block.
  * @returns The AST `stringValue` node.
  */
-export function StringValue(
-  value: string,
-  block = false,
-): Record<string, string> {
+export function StringValue(value: string, block = false): StringValueNode {
   return {
     kind: "StringValue",
     value,
-    block: String(block),
+    block: block,
   };
 }
 
@@ -41,7 +44,7 @@ export function StringValue(
 export function ObjectTypeDefinition(spec: {
   name: string;
   description?: string | null;
-}): unknown {
+}): ObjectTypeDefinitionNode {
   return {
     kind: "ObjectTypeDefinition",
     name: Name(spec.name),

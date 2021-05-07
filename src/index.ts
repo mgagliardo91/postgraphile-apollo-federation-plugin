@@ -267,7 +267,7 @@ const AddKeyPlugin: Plugin = (builder) => {
       }
 
       const astNode = {
-        ...Object.assign({}, ObjectTypeDefinition(type)),
+        ...ObjectTypeDefinition(type),
         ...type.astNode,
       };
 
@@ -354,7 +354,7 @@ const AddKeyPlugin: Plugin = (builder) => {
      * output it.
      */
     const astNode = {
-      ...Object.assign({}, ObjectTypeDefinition(spec)),
+      ...ObjectTypeDefinition(spec),
       ...Self.astNode,
     };
 
@@ -376,10 +376,10 @@ const AddKeyPlugin: Plugin = (builder) => {
     }
 
     // Add our types to the entity types
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return [
       ...types,
       ...new Set(build.graphqlObjectTypesForEntityType),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ] as any[];
   });
 };
