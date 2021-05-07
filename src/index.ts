@@ -376,11 +376,7 @@ const AddKeyPlugin: Plugin = (builder) => {
     }
 
     // Add our types to the entity types
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return [
-      ...types,
-      ...new Set(build.graphqlObjectTypesForEntityType),
-    ] as any[];
+    return [...types, ...build.graphqlObjectTypesForEntityType];
   });
 };
 
