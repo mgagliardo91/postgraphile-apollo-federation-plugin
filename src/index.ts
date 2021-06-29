@@ -4,15 +4,37 @@ import {
   gql,
   ExtensionDefinition,
 } from "graphile-utils";
+
+import {
+  GraphQLFieldConfigMap,
+  GraphQLObjectTypeConfig,
+  GraphQLResolveInfo,
+} from "graphql";
+
 import { Build, Context, Plugin } from "graphile-build";
 import printFederatedSchema from "./printFederatedSchema";
 import { ObjectTypeDefinition, Directive, StringValue } from "./AST";
-import {
-  PgAttribute,
-  QueryBuilder,
-  SQLGen,
-} from "graphile-build-pg";
-import { GraphQLFieldConfigMap, GraphQLObjectTypeConfig } from "graphql";
+import { PgAttribute } from "graphile-build-pg";
+import { PromiseOrValue } from "graphql/jsutils/PromiseOrValue";
+
+import { defaultResolveReference } from "./defaultResolveReference";
+
+export type GraphQLReferenceResolver<TContext> = (
+  reference: Record<string, unknown>,
+  context: TContext,
+  info: GraphQLResolveInfo,
+) => unknown;
+
+declare module "graphql/type/definition" {
+  interface GraphQLObjectType {
+    resolveReference?: GraphQLReferenceResolver<unknown>;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface GraphQLObjectTypeConfig<TSource, TContext> {
+    resolveReference?: GraphQLReferenceResolver<TContext>;
+  }
+}
 
 /**
  * This plugin installs the schema outlined in the Apollo Federation spec, and
@@ -25,22 +47,45 @@ import { GraphQLFieldConfigMap, GraphQLObjectTypeConfig } from "graphql";
 const SchemaExtensionPlugin = makeExtendSchemaPlugin(
   (build: Build): ExtensionDefinition => {
     const {
-      graphql: { GraphQLScalarType, getNullableType },
+      graphql: { GraphQLScalarType, getNullableType, isObjectType },
       resolveNode,
       $$isQuery,
       getTypeByName,
-      scopeByType,
       inflection,
       nodeIdFieldName,
-      pgSql: sql,
-      parseResolveInfo,
-      pgQueryFromResolveData: queryFromResolveData,
-      pgPrepareAndRun,
     } = build;
 
     // Cache
     let Query: unknown;
-    let nodeType: string;
+
+    /**
+     * Checks if the value is an async function.
+     * @param value The value.
+     * @returns A value indicating if the value is an async function.
+     */
+    function isPromise<T>(value: PromiseOrValue<T>): value is Promise<T> {
+      return Boolean(
+        value && "then" in value && typeof value.then === "function",
+      );
+    }
+
+    /**
+     * Add type name to return object.
+     * @param maybeObject The return object.
+     * @param typename The name of the type representation.
+     * @returns The resolved type representation.
+     */
+    function addTypeNameToPossibleReturn<T>(
+      maybeObject: null | T,
+      typename: string,
+    ): null | (T & { __typename: string }) {
+      if (maybeObject !== null && typeof maybeObject === "object") {
+        Object.defineProperty(maybeObject, "__typename", {
+          value: typename,
+        });
+      }
+      return maybeObject as null | (T & { __typename: string });
+    }
 
     return {
       typeDefs: gql`
@@ -97,22 +142,17 @@ const SchemaExtensionPlugin = makeExtendSchemaPlugin(
       resolvers: {
         Query: {
           _entities(data, { representations }, context, resolveInfo) {
-            const { pgClient } = context;
             const {
               graphile: { fieldContext },
             } = resolveInfo;
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return representations.map(async (representation: any) => {
-              if (!representation || typeof representation !== "object") {
+              if (!representation || isObjectType(representation)) {
                 throw new Error("Invalid representation");
               }
 
-              const {
-                __typename,
-                [nodeIdFieldName]: nodeId,
-                ...representationKeys
-              } = representation;
+              const { __typename, [nodeIdFieldName]: nodeId } = representation;
 
               if (!__typename) {
                 throw new Error(
@@ -121,6 +161,7 @@ const SchemaExtensionPlugin = makeExtendSchemaPlugin(
               }
 
               if (nodeId) {
+                // Support node interface.
                 if (typeof nodeId !== "string") {
                   throw new Error(
                     "Failed to interpret representation, invalid nodeId",
@@ -136,77 +177,39 @@ const SchemaExtensionPlugin = makeExtendSchemaPlugin(
                   resolveInfo,
                 );
               } else {
-                const type = getTypeByName(__typename);
+                // Support non node interface keys.
+                // Validate user-defined type against schema
+                // to make sure it exists.
+                const type = resolveInfo.schema.getType(__typename);
 
-                if (!type) {
-                  throw new Error("Incorrect representation typename");
-                }
-
-                const { pgIntrospection: table } = scopeByType.get(type);
-
-                // Check if the representation key(s) exist in the type.
-                if (
-                  !table?.attributes?.some(
-                    (attribute: PgAttribute) =>
-                      representationKeys[inflection.column(attribute)] !=
-                        undefined || null,
-                  )
-                ) {
-                  throw new Error("Incorrect representation key(s)");
-                }
-
-                let whereClause: SQLGen;
-
-                // If multiple representation keys are present,
-                // treat them as `OR` logic. Return after the first match.
-                for (const representationKey in representationKeys) {
-                  // Get pg column attribute.
-                  const attr = table.attributes.find(
-                    (attribute: PgAttribute) =>
-                      inflection.column(attribute) === representationKey,
+                if (!type || !isObjectType(type)) {
+                  throw new Error(
+                    // eslint-disable-next-line max-len
+                    `The _entities resolver tried to load an entity for type "${__typename}", but no object type of that name was found in the schema`,
                   );
-
-                  // If we can't find the user specified representation key,
-                  // skip to the next representation key.
-                  if (!attr) {
-                    continue;
-                  }
-
-                  whereClause = sql.fragment`${sql.identifier(
-                    attr.name,
-                  )} = ${sql.value(representationKeys[representationKey])}`;
-
-                  // Stop looping. We only want to return first match.
-                  break;
                 }
 
-                const resolveData =
-                  fieldContext.getDataFromParsedResolveInfoFragment(
-                    parseResolveInfo(resolveInfo),
-                    type,
+                const result = build.resolveReferences[type.name]
+                  ? build.resolveReferences[type.name](
+                      representation,
+                      context,
+                      resolveInfo,
+                    )
+                  : build.defaultResolveReference(
+                      build,
+                      representation,
+                      context,
+                      resolveInfo,
+                    );
+
+                if (isPromise(result)) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  return result.then((x: any) =>
+                    addTypeNameToPossibleReturn(x, __typename),
                   );
+                }
 
-                const query = queryFromResolveData(
-                  sql.identifier(table.namespace.name, table.name),
-                  undefined,
-                  resolveData,
-                  {
-                    useAsterisk: false, // Because it's only a single relation, no need
-                  },
-                  (queryBuilder: QueryBuilder) => {
-                    queryBuilder.where(whereClause);
-                  },
-                  context,
-                  resolveInfo.rootValue,
-                );
-
-                const { text, values } = sql.compile(query);
-                const { rows } = await pgPrepareAndRun(pgClient, text, values);
-
-                // const result = rows.length > 1 ? rows : rows[0];
-                nodeType = __typename;
-
-                return { [nodeType]: __typename, ...rows[0] };
+                return addTypeNameToPossibleReturn(result, __typename);
               }
             });
           },
@@ -229,8 +232,8 @@ const SchemaExtensionPlugin = makeExtendSchemaPlugin(
             if (value === $$isQuery) {
               if (!Query) Query = getTypeByName(inflection.builtin("Query"));
               return Query;
-            } else if (value[nodeType]) {
-              return getNullableType(value[nodeType]);
+            } else if (value["__typename"]) {
+              return getNullableType(value["__typename"]);
             }
           },
         },
@@ -263,6 +266,9 @@ const AddKeyPlugin: Plugin = (builder) => {
 
     // The GraphQLObjectTypes to add to the _Entity union type for federation.
     build.graphqlObjectTypesForEntityType = [];
+
+    // Add the default federation representation resolver.
+    build.defaultResolveReference = defaultResolveReference;
 
     return build;
   });
