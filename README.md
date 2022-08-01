@@ -1,20 +1,20 @@
 # postgraphile-plugin-apollo-federation
 
-[![Travis CI](https://img.shields.io/travis/com/jarvisuser90/postgraphile-apollo-federation-plugin/main)](https://github.com/jarvisuser90/postgraphile-apollo-federation-plugin)
-[![npm version](https://img.shields.io/npm/v/postgraphile-apollo-federation-plugin)](https://www.npmjs.com/package/postgraphile-apollo-federation-plugin)
+[![Travis CI](https://img.shields.io/travis/com/jarvisuser9/postgraphile-plugin-apollo-federation/main)](https://github.com/jarvisuser9/postgraphile-plugin-apollo-federation)
+[![npm version](https://img.shields.io/npm/v/postgraphile-plugin-apollo-federation)](https://www.npmjs.com/package/postgraphile-plugin-apollo-federation)
 
 Apollo federation support for PostGraphile (or any Graphile Engine schema).
 
 ## Installation
 
 ```shell
-npm install postgraphile-apollo-federation-plugin
+npm install postgraphile-plugin-apollo-federation
 ```
 
 ## CLI usage
 
 ```shell
-postgraphile --append-plugins postgraphile-apollo-federation-plugin
+postgraphile --append-plugins postgraphile-plugin-apollo-federation
 ```
 
 ## Library usage
@@ -22,13 +22,13 @@ postgraphile --append-plugins postgraphile-apollo-federation-plugin
 ```js
 const express = require("express");
 const { postgraphile } = require("postgraphile");
-const { default: postgraphile-apollo-federation-plugin } = require("postgraphile-apollo-federation-plugin");
+const { default: postgraphile-plugin-apollo-federation } = require("postgraphile-plugin-apollo-federation");
 
 const app = express();
 
 app.use(
   postgraphile(process.env.DATABASE_URL, "public", {
-    appendPlugins: [postgraphile-apollo-federation-plugin],
+    appendPlugins: [postgraphile-plugin-apollo-federation],
   })
 );
 
