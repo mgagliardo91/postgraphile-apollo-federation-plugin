@@ -1,4 +1,4 @@
-# postgraphile-apollo-federation-plugin
+# postgraphile-plugin-apollo-federation
 
 [![Travis CI](https://img.shields.io/travis/com/jarvisuser90/postgraphile-apollo-federation-plugin/main)](https://github.com/jarvisuser90/postgraphile-apollo-federation-plugin)
 [![npm version](https://img.shields.io/npm/v/postgraphile-apollo-federation-plugin)](https://www.npmjs.com/package/postgraphile-apollo-federation-plugin)
